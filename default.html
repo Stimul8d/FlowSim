@@ -1,0 +1,474 @@
+﻿<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <link href="webix/webix.css" rel="stylesheet" />
+    <script src="webix/webix.js"></script>
+    <script src="//code.jquery.com/jquery-1.11.2.min.js"></script>
+    <script src="//code.jquery.com/jquery-migrate-1.2.1.min.js"></script>
+    <style>
+        .webix_clean {
+            vertical-align: central;
+            color: white;
+            font-size: 1.5em;
+        }
+
+        .station {
+            background-color: white;
+        }
+
+        .header {
+            color: white;
+        }
+    </style>
+    <title>Flow Sim</title>
+</head>
+<body style='margin:0;padding:0;'>
+    <div id='layout_div'></div>
+    <script type="text/javascript" charset="utf-8">
+
+        var ui = null;
+
+        var taskNum = 1;
+        var cycle = 1;
+
+        var rollCount = 0;
+
+        var resupplyCol0 = function () {
+            //$$('lst0').clearAll();
+            var col0Max = $$('0max').getValue();
+            for (var i = 1; i < col0Max; i++) {
+                $$('lst0').add({ id: taskNum, name: "Task " + taskNum + " (cycle " + cycle + ")" });
+                taskNum++;
+            }
+
+            $$('label0').data.label = "Station 1 (" + col0Max + ")";
+            $$('label0').refresh();
+        }
+
+        var updateSlider = function () {
+
+            if (running) return;
+            $$('lst0').clearAll();
+            var value = this.getValue();
+            var name = this.data.name;
+            taskNum = 1;
+            if (name.indexOf("max") > -1) {
+                var num = parseInt(name[0]);
+                var min = $$(num + 'min');
+                if (min.getValue() > value) {
+                    min.define("value", value);
+                    min.refresh();
+                }
+            }
+            else {
+                var num = parseInt(name[0]);
+                var max = $$(num + 'max');
+                if (max.getValue() < value) {
+                    max.define("value", value);
+                    max.refresh();
+                }
+            }
+            resupplyCol0();
+            this.refresh();
+        }
+
+        var r = function () {
+
+            var donePerCycle = [];
+
+            var col = 0;
+
+            var totalDone = 0;
+
+            this.num = 0;
+            cycle = 1;
+            this.cycleText = "Cycle : " + cycle;
+
+            var avg = 0;
+            this.avgProdText = "Avg : " + avg;
+
+            this.sumProdText = "Done : " + totalDone;
+
+            var inventory = 0;
+            this.inventoryText = "Inv : " + inventory;
+
+            this.text = "";
+
+            var rand = function (min, max) {
+
+                var adjustedHigh = (parseFloat(max) - parseFloat(min)) + 1;
+
+                return Math.floor(Math.random() * adjustedHigh) + parseFloat(min);
+            }
+
+            var calculateInventory = function () {
+                var sum = 0;
+                for (var i = 0; i <= 5; i++) {
+                    sum += $$('lst' + i).count();
+                }
+                return sum;
+            }
+
+            this.roll = function () {
+                console.log("Column " + col);
+
+                $('[view_id~=col' + col + ']').children().first().css('background-color', 'darksalmon');
+
+
+                var maxCapacity = 0;
+                var minCapacity = 0;
+
+                maxCapacity = $$(col + 'max').getValue();
+                minCapacity = $$(col + 'min').getValue();
+
+                this.num = rand(minCapacity, maxCapacity);
+                if (minCapacity === maxCapacity) {
+                    this.num = minCapacity;
+                }
+
+                if (col < 5) {
+                    //only move as many as you have
+                    var max = $$('lst' + (col)).count()
+                    var colCount = 0;
+                    for (var i = 0; i < max ; i++) {
+                        if (i === this.num) {
+                            this.moved = i
+                            break;
+                        }
+
+                        var prev = $$('lst' + (col));
+                        var cur = $$('lst' + (col + 1));
+                        var id = prev.getIdByIndex(0);
+                        var item = prev.getItem(id);
+                        prev.remove(id);
+                        cur.add(item);
+                        colCount = cur.count();
+                    }
+
+                    $$('label' + (col + 1)).data.label = "Station " + (col + 1) + " (" + colCount + ")";
+                    $$('label' + (col + 1)).refresh();
+                }
+                //col6
+                if (col === 5) {
+
+                    var max = $$('lst' + (col)).count()
+                    var toMove = max < this.num ? max : this.num;
+
+                    for (var i = 0; i < toMove ; i++) {
+
+                        var prev = $$('lst' + (col));
+                        var id = prev.getIdByIndex(0);
+                        var item = prev.getItem(id);
+                        prev.remove(id);
+                        totalDone++;
+                    }
+
+                    donePerCycle.push(toMove);
+
+                    avg = Math.round(totalDone / donePerCycle.length * 100) / 100;
+                    $$('avgProdtext').data.avgProdText = "Avg : " + avg;
+                    $$('avgProdtext').refresh();
+
+                    $$('sumProdtext').data.sumProdText = "Done : " + totalDone;
+                    $$('sumProdtext').refresh();
+                }
+
+                var colCount = $$('lst' + (col)).count();
+
+                $$('label' + col).data.label = "Station " + (col + 1) + " (" + colCount + ")";
+                $$('label' + col).refresh();
+
+                rollCount++;
+
+                $$('rolltext').data.text = ' Roll : ' + this.num;
+                $$('rolltext').refresh();
+
+                $('.station').css('background-color', 'white');
+
+                col++;
+
+                $('[view_id~=col' + col + ']').children().first().css('background-color', 'darksalmon');
+
+                if (col === 6) {
+                    cycle++;
+                    col = 0;
+                    resupplyCol0();
+
+                    $$('cycletext').data.cycleText = "Cycle : " + cycle;
+                    $$('cycletext').refresh();
+                }
+
+                var inventory = 0;
+
+                $$('inventorytext').data.inventoryText = "Inv : " + calculateInventory();
+                $$('inventorytext').refresh();
+
+            }
+
+            var clear = function () {
+                $('.station').css('background-color', 'white');
+                $('[view_id~=col0]').children().first().css('background-color', 'darksalmon');
+
+                taskNum = 1;
+                rollCount = 0;
+                cycle = 1;
+
+                for (var i = 0; i < 6; i++) {
+                    $$('lst' + i).clearAll();
+                    $$('label' + i).data.label = "Station " + (i + 1) + " (0)";
+                    $$('label' + i).refresh();
+                }
+
+                donePerCycle = [];
+
+                var col = 0;
+
+                totalDone = 0;
+
+                this.num = 0;
+
+                $$('cycletext').data.cycleText = "Cycle : 1";
+                $$('cycletext').refresh();
+
+                $$('avgProdtext').data.avgProdText = "Avg : 0";
+                $$('avgProdtext').refresh();
+
+                $$('sumProdtext').data.sumProdText = "Done : 0";
+                $$('sumProdtext').refresh();
+
+                $$('inventorytext').data.inventoryText = "Inv : 0";
+                $$('inventorytext').refresh();
+
+                resupplyCol0();
+            }
+            this.clear = clear;
+
+            running = false;
+
+            this.run = function () {
+                if (running) return;
+                running = true;
+                clear();
+                var length = $$('runLength').getValue();
+                var id = setInterval(function () {
+                    if (length != 0 && cycle >= (parseInt(length) + 1)) {
+                        clearInterval(id);
+                        running = false;
+                        return;
+                    }
+                    roller.roll();
+                }, 100);
+            }
+        }
+
+        var roller = new r();
+
+        webix.ui({
+            container: "layout_div",
+            id: "layout",
+            height: 550,
+            rows: [
+                { type: "header", template: "FlowSim", },
+                {
+                    view: "toolbar", elements: [
+                    { view: "button", value: "Clear", width: 100, click: roller.clear },
+                    { view: "button", value: "Step", width: 100, click: roller.roll },
+                    { view: "button", value: "Run", width: 100, click: roller.run },
+                    { view: "slider", id: "runLength", css: "header", title: webix.template("Run Length : #value# cycles"), value: "10", min: 0, max: 50 },
+                    { view: "template", id: 'rolltext', template: "#text#", type: "clean", data: roller },
+                    { view: "template", id: 'cycletext', template: "#cycleText#", type: "clean", data: roller },
+                    { view: "template", id: 'inventorytext', template: "#inventoryText#", type: "clean", data: roller },
+                    { view: "template", id: 'avgProdtext', template: "#avgProdText#", type: "clean", data: roller },
+                    { view: "template", id: 'sumProdtext', template: "#sumProdText#", type: "clean", data: roller }
+                    ]
+                },
+        {
+            cols: [
+               {
+                   id: 'col0',
+                   rows: [
+                       { view: "label", css: "station", id: "label0", label: "Station 1 (0)", inputWidth: 100, align: "center" },
+                       {
+                           cols: [
+                           {
+                               id: "0min", name: "0min", css: "station", view: "slider", title: webix.template("min #value#"), value: "1", min: 1, max: 10,
+                               on: {
+                                   onChange: updateSlider,
+                                   onSliderDrag: updateSlider
+                               }
+                           },
+                           {
+                               id: "0max", name: "0max", css: "station", view: "slider", title: webix.template("max #value#"), value: "6", min: 1, max: 10,
+                               on: {
+                                   onChange: updateSlider,
+                                   onSliderDrag: updateSlider
+                               }
+                           },
+                           ]
+                       },
+                       {
+                           view: "list",
+                           id: 'lst0',
+                           template: "#name#",
+                       }
+                   ]
+               },
+               {
+                   id: 'col1',
+                   rows: [
+                       { view: "label", css: "station", id: "label1", label: "Station 2 (0)", inputWidth: 100, align: "center" },
+                       {
+                           cols: [
+                           {
+                               id: "1min", name: "1min", css: "station", view: "slider", title: webix.template("min #value#"), value: "1", min: 1, max: 10,
+                               on: {
+                                   onChange: updateSlider,
+                                   onSliderDrag: updateSlider
+                               }
+                           },
+                           {
+                               id: "1max", name: "1max", css: "station", view: "slider", title: webix.template("max #value#"), value: "6", min: 1, max: 10,
+                               on: {
+                                   onChange: updateSlider,
+                                   onSliderDrag: updateSlider
+                               }
+                           },
+                           ]
+                       },
+                       {
+                           view: "list",
+                           id: 'lst1',
+                           template: "#name#",
+                       },
+                   ]
+               },
+               {
+                   id: 'col2',
+                   rows: [
+                       { view: "label", css: "station", id: "label2", label: "Station 3 (0)", inputWidth: 100, align: "center" },
+                       {
+                           cols: [
+                           {
+                               id: "2min", name: "2min", css: "station", view: "slider", title: webix.template("min #value#"), value: "1", min: 1, max: 10,
+                               on: {
+                                   onChange: updateSlider,
+                                   onSliderDrag: updateSlider
+                               }
+                           },
+                           {
+                               id: "2max", name: "2max", css: "station", view: "slider", title: webix.template("max #value#"), value: "6", min: 1, max: 10,
+                               on: {
+                                   onChange: updateSlider,
+                                   onSliderDrag: updateSlider
+                               }
+                           },
+                           ]
+                       },
+                       {
+                           view: "list",
+                           id: 'lst2',
+                           template: "#name#",
+                       }
+                   ]
+               },
+               {
+                   id: 'col3',
+                   rows: [
+                       { view: "label", css: "station", id: "label3", label: "Station 4 (0)", inputWidth: 100, align: "center" },
+                       {
+                           cols: [
+                           {
+                               id: "3min", name: "3min", css: "station", view: "slider", title: webix.template("min #value#"), value: "1", min: 1, max: 10,
+                               on: {
+                                   onChange: updateSlider,
+                                   onSliderDrag: updateSlider
+                               }
+                           },
+                           {
+                               id: "3max", name: "3max", css: "station", view: "slider", title: webix.template("max #value#"), value: "6", min: 1, max: 10,
+                               on: {
+                                   onChange: updateSlider,
+                                   onSliderDrag: updateSlider
+                               }
+                           },
+                           ]
+                       },
+                       {
+                           view: "list",
+                           id: 'lst3',
+                           template: "#name#",
+                       }
+                   ]
+               },
+               {
+                   id: 'col4',
+                   rows: [
+                       { view: "label", css: "station", id: "label4", label: "Station 5 (0)", inputWidth: 100, align: "center" },
+                       {
+                           cols: [
+                           {
+                               id: "4min", name: "4min", css: "station", view: "slider", title: webix.template("min #value#"), value: "1", min: 1, max: 10,
+                               on: {
+                                   onChange: updateSlider,
+                                   onSliderDrag: updateSlider
+                               }
+                           },
+                           {
+                               id: "4max", name: "4max", css: "station", view: "slider", title: webix.template("max #value#"), value: "6", min: 1, max: 10,
+                               on: {
+                                   onChange: updateSlider,
+                                   onSliderDrag: updateSlider
+                               }
+                           },
+                           ]
+                       },
+                       {
+                           view: "list",
+                           id: 'lst4',
+                           template: "#name#",
+                       }
+                   ]
+               }
+               ,
+               {
+                   id: 'col5',
+                   rows: [
+                       { view: "label", css: "station", id: "label5", label: "Station 6 (0)", inputWidth: 100, align: "center" },
+                       {
+                           cols: [
+                           {
+                               id: "5min", name: "5min", css: "station", view: "slider", title: webix.template("min #value#"), value: "1", min: 1, max: 10,
+                               on: {
+                                   onChange: updateSlider,
+                                   onSliderDrag: updateSlider
+                               }
+                           },
+                           {
+                               id: "5max", name: "5max", css: "station", view: "slider", title: webix.template("max #value#"), value: "6", min: 1, max: 10,
+                               on: {
+                                   onChange: updateSlider,
+                                   onSliderDrag: updateSlider
+                               }
+                           },
+                           ]
+                       },
+                       {
+                           view: "list",
+                           id: 'lst5',
+                           template: "#name#",
+                       }
+                   ]
+               }
+            ]
+        }
+            ]
+        }).show();
+
+        $('[view_id~=col0]').children().first().css('background-color', 'darksalmon');
+
+        resupplyCol0();
+
+    </script>
+
+</body>
+</html>
